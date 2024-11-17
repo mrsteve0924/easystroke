@@ -527,6 +527,14 @@ void Button::run() {
 void SendKey::run() {
 	if (!key)
 		return;
+
+	Window curFoc;
+	int v;
+	XGetInputFocus(dpy, &curFoc, &v);
+	if (curFoc != current_app_window.get()) {
+		XSetInputFocus(dpy, current_app_window.get(), RevertToNone, CurrentTime);
+	}
+
 	guint code = XKeysymToKeycode(dpy, key);
 	XTestFakeKeyEvent(dpy, code, true, 0);
 	XTestFakeKeyEvent(dpy, code, false, 0);
