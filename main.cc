@@ -38,6 +38,15 @@
 #include <fcntl.h>
 #include <getopt.h>
 
+#include <cstdlib>
+#include <iostream>
+#include <glibmm.h>
+#include <giomm.h>
+#include <string>
+#include <array>
+#include <memory>
+
+
 extern Source<bool> disabled;
 
 bool experimental = false;
@@ -497,25 +506,61 @@ App::~App() {
 	}
 }
 
+void ensure_dbus_session() {
+    if (getenv("DBUS_SESSION_BUS_ADDRESS")) {
+        return; // Already set
+    }
+
+    std::array<char, 128> buffer;
+    std::string dbus_command = "dbus-launch --sh-syntax";
+
+    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(dbus_command.c_str(), "r"), pclose);
+    if (!pipe) {
+        std::cerr << "Failed to start dbus-launch" << std::endl;
+        return;
+    }
+
+    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+        std::string line(buffer.data());
+        // Parse lines like: DBUS_SESSION_BUS_ADDRESS='...'; export DBUS_SESSION_BUS_ADDRESS;
+        auto pos = line.find("=");
+        if (pos != std::string::npos) {
+            std::string key = line.substr(0, pos);
+            std::string val = line.substr(pos + 1);
+            // Remove trailing semicolon and whitespace
+            val.erase(val.find_last_not_of(" ;\n") + 1);
+            // Remove single quotes
+            if (!val.empty() && val.front() == '\'' && val.back() == '\'') {
+                val = val.substr(1, val.size() - 2);
+            }
+            setenv(key.c_str(), val.c_str(), 1);
+        }
+    }
+}
+
+
 int main(int argc, char **argv) {
-	if (0) {
-		RStroke trefoil = Stroke::trefoil();
-		trefoil->draw_svg("easystroke.svg");
-		exit(EXIT_SUCCESS);
-	}
-	// GtkApplication needs dbus to even invoke the local_command_line function
-	if (argc > 1 && !strcmp(argv[1], "--help")) {
-		App::usage(argv[0]);
-		return EXIT_SUCCESS;
-	}
+    ensure_dbus_session();  // <- ensures DBUS_SESSION_BUS_ADDRESS is set
 
-	if (argc > 1 && !strcmp(argv[1], "--version")) {
-		App::usage(argv[0]);
-		return EXIT_SUCCESS;
-	}
+    if (0) {
+        RStroke trefoil = Stroke::trefoil();
+        trefoil->draw_svg("easystroke.svg");
+        exit(EXIT_SUCCESS);
+    }
 
-	App app(argc, argv, "org.easystroke.easystroke", Gio::APPLICATION_HANDLES_COMMAND_LINE);
-	return app.run(argc, argv);
+    // GtkApplication needs dbus to even invoke the local_command_line function
+    if (argc > 1 && !strcmp(argv[1], "--help")) {
+        App::usage(argv[0]);
+        return EXIT_SUCCESS;
+    }
+
+    if (argc > 1 && !strcmp(argv[1], "--version")) {
+        App::usage(argv[0]);
+        return EXIT_SUCCESS;
+    }
+
+    App app(argc, argv, "org.easystroke.easystroke", Gio::APPLICATION_HANDLES_COMMAND_LINE);
+    return app.run(argc, argv);
 }
 
 void Button::run() {
