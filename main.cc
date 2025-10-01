@@ -322,7 +322,10 @@ int App::on_command_line(const Glib::RefPtr<Gio::ApplicationCommandLine> &comman
 			else
 				run_by_name(arg[i], command_line);
 		} else if (!strcmp(arg[i], "show")) {
-			win->show();
+			if (win) {
+        	    win->get_window().show_all();   // make the GTK window visible
+        	    win->show();                    // then switch to the config page
+    		}
 		} else if (!strcmp(arg[i], "hide")) {
 			win->hide();
 		} else if (!strcmp(arg[i], "disable")) {
